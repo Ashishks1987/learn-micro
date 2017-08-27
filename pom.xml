@@ -17,6 +17,10 @@
 
     <modules>
         <module>api-gateway</module>
+        <module>action-service</module>
+        <module>market</module>
+        <module>hunter</module>
+        <module>connectors</module>
     </modules>
 
     
