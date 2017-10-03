@@ -11,7 +11,7 @@ import org.springframework.http.converter.HttpMessageNotWritableException;
 
 import java.io.IOException;
 
-import static com.sun.xml.internal.ws.commons.xmlutil.Converter.UTF_8;
+import static org.apache.commons.lang3.CharEncoding.UTF_8;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 public class JsonElementHttpMessageConverter extends AbstractHttpMessageConverter<JsonElement> {
