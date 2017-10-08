@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.AsyncRestOperations;
+import org.springframework.web.client.HttpClientErrorException;
 import rx.Observable;
 import rx.Single;
 
@@ -28,6 +29,11 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
 @RestController
 public class MarketController {
+
+    /*
+        Persist fetched data in a Cache for PT minutes. (10 mins.)
+        Helps to reduce API usage count.
+     */
 
     @Resource
     private AsyncRestOperations rest;
@@ -56,7 +62,7 @@ public class MarketController {
         String script = eqQuoteRequest.getEqScript();
         String exchange = eqQuoteRequest.getEqExchange();
         String yahooUrl = yahooApi.replace("SCRIPT", script)
-                                    .replace("EXCHANGE", exchange);
+                .replace("EXCHANGE", exchange);
 
         HttpHeaders headers = new HttpHeaders();
         headers.add("Accept", APPLICATION_JSON_VALUE);
@@ -64,16 +70,22 @@ public class MarketController {
                 new HttpEntity<>(headers), JsonElement.class);
 
         return Async.toSingle(futureYahoo).toObservable()
-                .onErrorResumeNext(this::skipError)
+                .onErrorResumeNext(throwable -> skipError(throwable, script, exchange))
                 .flatMap(entity -> processYahooResponse(entity, script, exchange));
     }
 
-    private Observable<ResponseEntity<JsonElement>> skipError(Throwable throwable) {
-        System.out.println(">>>>>>>>>>>>>>>> Error! : "+throwable.getMessage());
-        return Observable.empty();
+    private Observable<ResponseEntity<JsonElement>> skipError(Throwable throwable, String script, String exchange) {
+        System.out.println("Error : " + throwable.getMessage());
+        if (throwable instanceof HttpClientErrorException) {
+            // Just ignore client error as of now.
+            System.out.println("It is a client error for script : " + script + ", exchange : " + exchange);
+            return Observable.empty();
+        }
+        // If its not a client error, let it bubble up.
+        return Observable.error(throwable);
     }
 
-    private Observable<Equity> processYahooResponse(ResponseEntity<JsonElement> yahooResponse, String script, String exchange){
+    private Observable<Equity> processYahooResponse(ResponseEntity<JsonElement> yahooResponse, String script, String exchange) {
         JsonElement yResponse = yahooResponse.getBody();
         String quote = yResponse.read("$.quoteSummary.result[0].price.regularMarketPrice.fmt");
         Equity equity = new Equity(script, exchange);
